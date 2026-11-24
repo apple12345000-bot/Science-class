@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>六年級防災教育互動學習平台</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', '微軟正黑體', sans-serif; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .quiz-option { cursor: pointer; transition: all 0.2s; }
+    .quiz-option:hover { transform: translateX(4px); }
+    .quiz-option.correct { background: #22c55e !important; color: white !important; border-color: #16a34a !important; }
+    .quiz-option.wrong { background: #ef4444 !important; color: white !important; border-color: #dc2626 !important; }
+    .drag-item { cursor: grab; user-select: none; transition: all 0.2s; }
+    .drag-item:active { cursor: grabbing; opacity: 0.7; }
+    .drop-zone { transition: all 0.2s; min-height: 50px; }
+    .drop-zone.drag-over { border-color: #3b82f6 !important; background: #eff6ff !important; }
+    .map-room { cursor: pointer; transition: all 0.2s; }
+    .map-room:hover { opacity: 0.8; transform: scale(1.02); }
+    .map-room.selected { ring: 2px solid #f59e0b; }
+    .star { color: #f59e0b; }
+    .progress-bar { transition: width 0.5s ease; }
+    .card-flip { perspective: 600px; }
+    .card-inner { transition: transform 0.6s; transform-style: preserve-3d; }
+    .card-flip:hover .card-inner { transform: rotateY(180deg); }
+    .card-front, .card-back { backface-visibility: hidden; }
+    .card-back { transform: rotateY(180deg); }
+    @keyframes bounce-in { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+    .bounce-in { animation: bounce-in 0.5s ease; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-8px)} 80%{transform:translateX(8px)} }
+    .shake { animation: shake 0.5s ease; }
+    .print-area { display: none; }
+    @media print {
+      body > * { display: none; }
+      .print-area { display: block !important; }
+    }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] min-h-screen">
+
+<!-- 頁首 -->
+<header style="background: linear-gradient(135deg, #1e40af 0%, #0891b2 50%, #059669 100%);" class="text-white py-6 px-6 shadow-lg">
+  <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <div class="text-5xl">🛡️</div>
+      <div>
+        <h1 class="text-2xl font-bold">防災小英雄學習平台</h1>
+        <p class="text-blue-100 text-sm">六年級防災教育 ｜ 互動學習・創作成果</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <div id="scoreDisplay" class="bg-white/20 backdrop-blur rounded-xl px-4 py-2 text-center">
+        <div class="text-xs text-blue-100">累積積分</div>
+        <div class="text-2xl font-bold" id="totalScore">0</div>
+      </div>
+      <div id="badgeDisplay" class="bg-white/20 backdrop-blur rounded-xl px-4 py-2 text-center">
+        <div class="text-xs text-blue-100">獲得徽章</div>
+        <div class="text-2xl font-bold" id="badgeCount">0</div>
+      </div>
+    </div>
+  </div>
+  <!-- 進度條 -->
+  <div class="max-w-6xl mx-auto mt-4">
+    <div class="flex justify-between text-xs text-blue-100 mb-1">
+      <span>學習進度</span>
+      <span id="progressText">0 / 5 單元完成</span>
+    </div>
+    <div class="bg-white/20 rounded-full h-3">
+      <div id="mainProgress" class="progress-bar bg-gradient-to-r from-yellow-300 to-green-400 h-3 rounded-full" style="width:0%"></div>
+    </div>
+  </div>
+</header>
+
+<!-- 導覽列 -->
+<nav class="bg-[var(--card)] border-b border-[var(--border)] sticky top-0 z-50 shadow-sm">
+  <div class="max-w-6xl mx-auto flex overflow-x-auto gap-1 p-2">
+    <button onclick="switchTab('home')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-blue-600 text-white" data-tab="home">🏠 學習首頁</button>
+    <button onclick="switchTab('knowledge')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]" data-tab="knowledge">📚 防災知識庫</button>
+    <button onclick="switchTab('quiz')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]" data-tab="quiz">🧠 知識大挑戰</button>
+    <button onclick="switchTab('map')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]" data-tab="map">🗺️ 避難地圖</button>
+    <button onclick="switchTab('card')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]" data-tab="card">📋 製作防災卡</button>
+    <button onclick="switchTab('escape')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]" data-tab="escape">🏃 逃生演練</button>
+    <button onclick="switchTab('output')" class="nav-btn flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-all bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]" data-tab="output">📤 我的作品集</button>
+  </div>
+</nav>
+
+<main class="max-w-6xl mx-auto p-4 md:p-6">
+
+<!-- ===== 首頁 ===== -->
+<div id="tab-home" class="tab-content active">
+  <div class="grid md:grid-cols-3 gap-6 mb-8">
+    <div class="md:col-span-2 bg-gradient-to-br from-blue-500 to-cyan-600 text-white rounded-2xl p-6 shadow-lg">
+      <div class="text-4xl mb-3">🌏 歡迎來到防災小英雄學習平台！</div>
+      <h2 class="text-xl font-bold mb-2">台灣是天然災害多發地區</h2>
+      <p class="text-blue-100 text-sm leading-relaxed mb-4">台灣常有地震、颱風等災害發生。當災害導致交通、通訊中斷，家庭成員聯繫困難時，我們需要提前做好準備！<br><br>🎯 完成所有單元，成為真正的防災小英雄！</p>
+      <div class="flex gap-3 flex-wrap">
+        <div class="bg-white/20 rounded-xl px-4 py-2 text-center">
+          <div class="text-2xl">📚</div>
+          <div class="text-xs mt-1">5個學習單元</div>
+        </div>
+        <div class="bg-white/20 rounded-xl px-4 py-2 text-center">
+          <div class="text-2xl">🏆</div>
+          <div class="text-xs mt-1">10種徽章</div>
+        </div>
+        <div class="bg-white/20 rounded-xl px-4 py-2 text-center">
+          <div class="text-2xl">📄</div>
+          <div class="text-xs mt-1">可列印作品</div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm">
+      <h3 class="font-bold text-lg mb-4 flex items-center gap-2">🏅 我的徽章牆</h3>
+      <div id="badgeWall" class="grid grid-cols-3 gap-3">
+        <!-- badges go here -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- 學習路線 -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm mb-6">
+    <h3 class="font-bold text-xl mb-5 flex items-center gap-2">🗺️ 學習路線圖</h3>
+    <div class="flex flex-col md:flex-row items-center gap-3 overflow-x-auto pb-2">
+      <div class="unit-card bg-blue-50 border-2 border-blue-400 rounded-xl p-4 text-center min-w-[140px] cursor-pointer hover:shadow-md transition-all" onclick="switchTab('knowledge')">
+        <div class="text-3xl mb-2">📚</div>
+        <div class="font-bold text-sm text-blue-700">第1站</div>
+        <div class="text-sm font-medium">防災知識庫</div>
+        <div id="unit1-status" class="text-xs text-gray-400 mt-1">待開始</div>
+      </div>
+      <div class="text-2xl text-gray-300 hidden md:block">→</div>
+      <div class="unit-card bg-purple-50 border-2 border-purple-400 rounded-xl p-4 text-center min-w-[140px] cursor-pointer hover:shadow-md transition-all" onclick="switchTab('quiz')">
+        <div class="text-3xl mb-2">🧠</div>
+        <div class="font-bold text-sm text-purple-700">第2站</div>
+        <div class="text-sm font-medium">知識大挑戰</div>
+        <div id="unit2-status" class="text-xs text-gray-400 mt-1">待開始</div>
+      </div>
+      <div class="text-2xl text-gray-300 hidden md:block">→</div>
+      <div class="unit-card bg-green-50 border-2 border-green-400 rounded-xl p-4 text-center min-w-[140px] cursor-pointer hover:shadow-md transition-all" onclick="switchTab('map')">
+        <div class="text-3xl mb-2">🗺️</div>
+        <div class="font-bold text-sm text-green-700">第3站</div>
+        <div class="text-sm font-medium">避難地圖</div>
+        <div id="unit3-status" class="text-xs text-gray-400 mt-1">待開始</div>
+      </div>
+      <div class="text-2xl text-gray-300 hidden md:block">→</div>
+      <div class="unit-card bg-orange-50 border-2 border-orange-400 rounded-xl p-4 text-center min-w-[140px] cursor-pointer hover:shadow-md transition-all" onclick="switchTab('card')">
+        <div class="text-3xl mb-2">📋</div>
+        <div class="font-bold text-sm text-orange-700">第4站</div>
+        <div class="text-sm font-medium">製作防災卡</div>
+        <div id="unit4-status" class="text-xs text-gray-400 mt-1">待開始</div>
+      </div>
+      <div class="text-2xl text-gray-300 hidden md:block">→</div>
+      <div class="unit-card bg-red-50 border-2 border-red-400 rounded-xl p-4 text-center min-w-[140px] cursor-pointer hover:shadow-md transition-all" onclick="switchTab('escape')">
+        <div class="text-3xl mb-2">🏃</div>
+        <div class="font-bold text-sm text-red-700">第5站</div>
+        <div class="text-sm font-medium">逃生演練</div>
+        <div id="unit5-status" class="text-xs text-gray-400 mt-1">待開始</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 防災小知識 Ticker -->
+  <div class="bg-yellow-50 border border-yellow-300 rounded-xl p-4 flex items-center gap-3">
+    <span class="text-xl">💡</span>
+    <div>
+      <span class="font-bold text-yellow-800">今日防災小提示：</span>
+      <span id="dailyTip" class="text-yellow-700 text-sm"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 防災知識庫 ===== -->
+<div id="tab-knowledge" class="tab-content">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">📚 防災知識庫</h2>
+    <p class="text-[var(--muted-foreground)] text-sm">點擊卡片翻轉查看詳情，學完所有卡片獲得徽章！</p>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-5 mb-8">
+    <!-- 知識卡1 -->
+    <div class="card-flip h-52 cursor-pointer" onclick="flipCard(this, 'k1')">
+      <div class="card-inner relative w-full h-full">
+        <div class="card-front absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-700 text-white rounded-2xl flex flex-col items-center justify-center p-5 shadow-lg">
+          <div class="text-5xl mb-3">🏠</div>
+          <h3 class="font-bold text-lg text-center">地震時在室內怎麼做？</h3>
+          <p class="text-blue-200 text-xs mt-2">👆 點擊翻轉查看</p>
+        </div>
+        <div class="card-back absolute inset-0 bg-white rounded-2xl flex flex-col justify-center p-5 shadow-lg border-2 border-blue-400">
+          <div class="text-2xl mb-2">✅ 正確動作</div>
+          <ul class="text-sm space-y-1 text-gray-700">
+            <li>🔸 <strong>趴下</strong> — 降低重心</li>
+            <li>🔸 <strong>掩護</strong> — 躲在桌子下方</li>
+            <li>🔸 <strong>穩住</strong> — 抓緊桌腳不動</li>
+            <li>🔸 遠離窗戶、書架</li>
+            <li>🔸 不要跑到戶外</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <!-- 知識卡2 -->
+    <div class="card-flip h-52 cursor-pointer" onclick="flipCard(this, 'k2')">
+      <div class="card-inner relative w-full h-full">
+        <div class="card-front absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-700 text-white rounded-2xl flex flex-col items-center justify-center p-5 shadow-lg">
+          <div class="text-5xl mb-3">🎒</div>
+          <h3 class="font-bold text-lg text-center">緊急避難包裝什麼？</h3>
+          <p class="text-green-200 text-xs mt-2">👆 點擊翻轉查看</p>
+        </div>
+        <div class="card-back absolute inset-0 bg-white rounded-2xl flex flex-col justify-center p-5 shadow-lg border-2 border-green-400">
+          <div class="text-2xl mb-2">🎒 必備物品</div>
+          <div class="grid grid-cols-2 gap-1 text-xs text-gray-700">
+            <span>💧 飲用水（3天份）</span>
+            <span>🍱 食物（乾糧）</span>
+            <span>💊 急救藥品</span>
+            <span>🔦 手電筒+電池</span>
+            <span>📻 收音機</span>
+            <span>📄 重要文件</span>
+            <span>💰 現金</span>
+            <span>🧥 備用衣物</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 知識卡3 -->
+    <div class="card-flip h-52 cursor-pointer" onclick="flipCard(this, 'k3')">
+      <div class="card-inner relative w-full h-full">
+        <div class="card-front absolute inset-0 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-2xl flex flex-col items-center justify-center p-5 shadow-lg">
+          <div class="text-5xl mb-3">📱</div>
+          <h3 class="font-bold text-lg text-center">家庭防災卡的用途</h3>
+          <p class="text-orange-200 text-xs mt-2">👆 點擊翻轉查看</p>
+        </div>
+        <div class="card-back absolute inset-0 bg-white rounded-2xl flex flex-col justify-center p-5 shadow-lg border-2 border-orange-400">
+          <div class="text-2xl mb-2">📋 防災卡功能</div>
+          <ul class="text-sm space-y-1 text-gray-700">
+            <li>📞 緊急聯絡人電話</li>
+            <li>🏥 附近醫院資訊</li>
+            <li>📍 集合地點設定</li>
+            <li>🆘 1991防災專線</li>
+            <li>⚠️ 家庭成員特殊需求</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <!-- 知識卡4 -->
+    <div class="card-flip h-52 cursor-pointer" onclick="flipCard(this, 'k4')">
+      <div class="card-inner relative w-full h-full">
+        <div class="card-front absolute inset-0 bg-gradient-to-br from-purple-500 to-violet-700 text-white rounded-2xl flex flex-col items-center justify-center p-5 shadow-lg">
+          <div class="text-5xl mb-3">🌀</div>
+          <h3 class="font-bold text-lg text-center">颱風來臨前的準備</h3>
+          <p class="text-purple-200 text-xs mt-2">👆 點擊翻轉查看</p>
+        </div>
+        <div class="card-back absolute inset-0 bg-white rounded-2xl flex flex-col justify-center p-5 shadow-lg border-2 border-purple-400">
+          <div class="text-2xl mb-2">🌀 颱風準備清單</div>
+          <ul class="text-sm space-y-1 text-gray-700">
+            <li>🔧 固定陽台花盆、物品</li>
+            <li>💧 儲備飲用水和食物</li>
+            <li>🔌 手機電池充飽電</li>
+            <li>📺 關注氣象局資訊</li>
+            <li>🚗 車輛停至安全地點</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <!-- 知識卡5 -->
+    <div class="card-flip h-52 cursor-pointer" onclick="flipCard(this, 'k5')">
+      <div class="card-inner relative w-full h-full">
+        <div class="card-front absolute inset-0 bg-gradient-to-br from-teal-500 to-cyan-700 text-white rounded-2xl flex flex-col items-center justify-center p-5 shadow-lg">
+          <div class="text-5xl mb-3">🏫</div>
+          <h3 class="font-bold text-lg text-center">學校避難集合點</h3>
+          <p class="text-teal-200 text-xs mt-2">👆 點擊翻轉查看</p>
+        </div>
+        <div class="card-back absolute inset-0 bg-white rounded-2xl flex flex-col justify-center p-5 shadow-lg border-2 border-teal-400">
+          <div class="text-2xl mb-2">🏫 避難要點</div>
+          <ul class="text-sm space-y-1 text-gray-700">
+            <li>✅ 往操場/空曠處集合</li>
+            <li>✅ 遠離玻璃和高處</li>
+            <li>✅ 聽從師長指示</li>
+            <li>✅ 同學互相確認安全</li>
+            <li>✅ 熟悉逃生路線位置</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <!-- 知識卡6 -->
+    <div class="card-flip h-52 cursor-pointer" onclick="flipCard(this, 'k6')">
+      <div class="card-inner relative w-full h-full">
+        <div class="card-front absolute inset-0 bg-gradient-to-br from-pink-500 to-rose-700 text-white rounded-2xl flex flex-col items-center justify-center p-5 shadow-lg">
+          <div class="text-5xl mb-3">🔥</div>
+          <h3 class="font-bold text-lg text-center">火災逃生原則</h3>
+          <p class="text-pink-200 text-xs mt-2">👆 點擊翻轉查看</p>
+        </div>
+        <div class="card-back absolute inset-0 bg-white rounded-2xl flex flex-col justify-center p-5 shadow-lg border-2 border-pink-400">
+          <div class="text-2xl mb-2">🔥 逃生原則</div>
+          <ul class="text-sm space-y-1 text-gray-700">
+            <li>🚫 不搭電梯，走安全梯</li>
+            <li>👃 用濕布摀住口鼻</li>
+            <li>🤸 低姿勢前進避煙霧</li>
+            <li>🚪 摸門把確認是否熱</li>
+            <li>📞 逃出後打119報案</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="knowledgeComplete" class="hidden bg-green-50 border-2 border-green-400 rounded-xl p-4 text-center">
+    <div class="text-3xl mb-2">🎉</div>
+    <p class="font-bold text-green-700">太棒了！你已學完所有防災知識！獲得「知識達人」徽章！</p>
+  </div>
+</div>
+
+<!-- ===== 知識大挑戰 ===== -->
+<div id="tab-quiz" class="tab-content">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">🧠 知識大挑戰</h2>
+    <div class="flex gap-4 text-sm text-[var(--muted-foreground)]">
+      <span>問題 <strong id="qNum">1</strong>/10</span>
+      <span>得分：<strong id="quizScore">0</strong></span>
+    </div>
+    <div class="bg-[var(--background)] rounded-full h-2 mt-2">
+      <div id="quizProgress" class="progress-bar bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full" style="width:10%"></div>
+    </div>
+  </div>
+
+  <div id="quizArea" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm">
+    <div id="questionText" class="text-lg font-bold mb-6"></div>
+    <div id="optionsArea" class="space-y-3"></div>
+    <div id="quizFeedback" class="hidden mt-4 p-4 rounded-xl text-sm font-medium"></div>
+    <button id="nextQuizBtn" onclick="nextQuestion()" class="hidden mt-4 bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-all">下一題 →</button>
+  </div>
+
+  <div id="quizResult" class="hidden bg-[var(--card)] border border-[var(--border)] rounded-2xl p-8 text-center shadow-sm">
+    <div class="text-6xl mb-4" id="resultEmoji">🏆</div>
+    <h3 class="text-2xl font-bold mb-2" id="resultTitle"></h3>
+    <p class="text-[var(--muted-foreground)] mb-4" id="resultDesc"></p>
+    <div class="text-4xl font-bold text-purple-600 mb-6" id="finalScoreDisplay"></div>
+    <button onclick="restartQuiz()" class="bg-purple-600 text-white px-8 py-3 rounded-xl hover:bg-purple-700 transition-all font-medium">再挑戰一次</button>
+  </div>
+</div>
+
+<!-- ===== 避難地圖互動 ===== -->
+<div id="tab-map" class="tab-content">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">🗺️ 校園避難地圖挑戰</h2>
+    <p class="text-[var(--muted-foreground)] text-sm">在地圖上找出正確的避難路線和集合地點！</p>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="md:col-span-2">
+      <div class="bg-[var(--card)] border-2 border-[var(--border)] rounded-2xl p-4 shadow-sm">
+        <h3 class="font-bold mb-3 text-sm text-[var(--muted-foreground)]">學校平面圖（點擊各區域）</h3>
+        <!-- 互動地圖 SVG -->
+        <svg viewBox="0 0 500 380" class="w-full border border-[var(--border)] rounded-xl bg-green-50">
+          <!-- 操場/避難集合地點 -->
+          <ellipse cx="250" cy="230" rx="90" ry="60" fill="#86efac" stroke="#16a34a" stroke-width="2"/>
+          <text x="250" y="225" text-anchor="middle" class="text-sm" font-size="13" font-weight="bold" fill="#15803d">避難集合地點</text>
+          <text x="250" y="242" text-anchor="middle" font-size="11" fill="#16a34a">🏃 操場</text>
+          
+          <!-- 教室區 1F -->
+          <rect x="30" y="280" width="80" height="50" rx="6" fill="#93c5fd" stroke="#2563eb" stroke-width="2" class="map-room" onclick="showRoomInfo('classroom1f', '一樓教室')"/>
+          <text x="70" y="308" text-anchor="middle" font-size="11" fill="#1e40af">教室1F</text>
+          <rect x="120" y="280" width="80" height="50" rx="6" fill="#93c5fd" stroke="#2563eb" stroke-width="2" class="map-room" onclick="showRoomInfo('classroom1f', '多媒體教室')"/>
+          <text x="160" y="308" text-anchor="middle" font-size="11" fill="#1e40af">多媒體</text>
+          <rect x="210" y="310" width="80" height="50" rx="6" fill="#fca5a5" stroke="#dc2626" stroke-width="2" class="map-room" onclick="showRoomInfo('library', '圖書室')"/>
+          <text x="250" y="338" text-anchor="middle" font-size="11" fill="#991b1b">圖書室</text>
+          
+          <!-- 教室區 2F -->
+          <rect x="30" y="80" width="80" height="50" rx="6" fill="#c4b5fd" stroke="#7c3aed" stroke-width="2" class="map-room" onclick="showRoomInfo('special', '專科教室A')"/>
+          <text x="70" y="108" text-anchor="middle" font-size="11" fill="#5b21b6">專科A</text>
+          <rect x="120" y="80" width="80" height="50" rx="6" fill="#c4b5fd" stroke="#7c3aed" stroke-width="2" class="map-room" onclick="showRoomInfo('special', '專科教室B')"/>
+          <text x="160" y="108" text-anchor="middle" font-size="11" fill="#5b21b6">專科B</text>
+          <rect x="210" y="80" width="80" height="50" rx="6" fill="#c4b5fd" stroke="#7c3aed" stroke-width="2" class="map-room" onclick="showRoomInfo('special', '專科教室C')"/>
+          <text x="250" y="108" text-anchor="middle" font-size="11" fill="#5b21b6">專科C</text>
+          <rect x="300" y="80" width="80" height="50" rx="6" fill="#93c5fd" stroke="#2563eb" stroke-width="2" class="map-room" onclick="showRoomInfo('classroom2f', '二樓教室')"/>
+          <text x="340" y="108" text-anchor="middle" font-size="11" fill="#1e40af">教室2F</text>
+          
+          <!-- 右側設施 -->
+          <rect x="400" y="150" width="70" height="45" rx="6" fill="#fde68a" stroke="#d97706" stroke-width="2" class="map-room" onclick="showRoomInfo('aid', '急救站')"/>
+          <text x="435" y="176" text-anchor="middle" font-size="11" fill="#92400e">🏥急救站</text>
+          <rect x="400" y="210" width="70" height="45" rx="6" fill="#bbf7d0" stroke="#16a34a" stroke-width="2" class="map-room" onclick="showRoomInfo('fire', '消防設備')"/>
+          <text x="435" y="236" text-anchor="middle" font-size="11" fill="#15803d">🧯消防</text>
+          
+          <!-- 大門 -->
+          <rect x="200" y="355" width="100" height="22" rx="5" fill="#f97316" stroke="#c2410c" stroke-width="2" class="map-room" onclick="showRoomInfo('gate', '大門')"/>
+          <text x="250" y="370" text-anchor="middle" font-size="12" font-weight="bold" fill="white">大門出口</text>
+          
+          <!-- 逃生路線箭頭 -->
+          <defs>
+            <marker id="arrowRed" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#ef4444"/>
+            </marker>
+          </defs>
+          <!-- 路線線條 -->
+          <line x1="70" y1="280" x2="200" y2="250" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowRed)"/>
+          <line x1="160" y1="280" x2="210" y2="265" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowRed)"/>
+          <line x1="70" y1="130" x2="175" y2="180" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowRed)"/>
+          <line x1="160" y1="130" x2="200" y2="195" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrowRed)"/>
+          
+          <!-- 樓梯標示 -->
+          <rect x="350" y="150" width="40" height="30" rx="4" fill="#fed7aa" stroke="#ea580c" stroke-width="1.5"/>
+          <text x="370" y="169" text-anchor="middle" font-size="10" fill="#9a3412">樓梯</text>
+          <line x1="370" y1="180" x2="370" y2="210" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="4,2"/>
+        </svg>
+        
+        <!-- 圖例 -->
+        <div class="flex flex-wrap gap-3 mt-3 text-xs">
+          <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-blue-300 rounded"></span>教室</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-purple-300 rounded"></span>專科教室</span>
+          <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-green-300 rounded"></span>集合地點</span>
+          <span class="flex items-center gap-1"><span class="text-red-400">- -→</span>逃生路線</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="space-y-4">
+      <div id="roomInfo" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold text-lg mb-3">📍 區域資訊</h3>
+        <p class="text-[var(--muted-foreground)] text-sm">👆 點擊地圖上的區域查看詳情</p>
+      </div>
+      
+      <!-- 路線規劃挑戰 -->
+      <div class="bg-orange-50 border-2 border-orange-300 rounded-2xl p-5">
+        <h3 class="font-bold text-orange-800 mb-3">🎯 逃生挑戰</h3>
+        <p class="text-sm text-orange-700 mb-3">你在<strong>圖書室</strong>，地震發生了！</p>
+        <p class="text-sm text-orange-700 mb-3">請選擇正確的逃生行動順序：</p>
+        <div id="escapeChallenge" class="space-y-2">
+          <button onclick="checkEscapeStep(1)" class="w-full text-left p-3 bg-white border-2 border-orange-200 rounded-lg text-sm hover:border-orange-400 transition-all">A. 趴下、掩護、穩住</button>
+          <button onclick="checkEscapeStep(2)" class="w-full text-left p-3 bg-white border-2 border-orange-200 rounded-lg text-sm hover:border-orange-400 transition-all">B. 立刻衝出教室</button>
+          <button onclick="checkEscapeStep(3)" class="w-full text-left p-3 bg-white border-2 border-orange-200 rounded-lg text-sm hover:border-orange-400 transition-all">C. 搭電梯下樓</button>
+          <button onclick="checkEscapeStep(4)" class="w-full text-left p-3 bg-white border-2 border-orange-200 rounded-lg text-sm hover:border-orange-400 transition-all">D. 躲到廁所</button>
+        </div>
+        <div id="challengeResult" class="hidden mt-3 p-3 rounded-lg text-sm font-medium"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 製作防災卡 ===== -->
+<div id="tab-card" class="tab-content">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">📋 製作我的家庭防災卡</h2>
+    <p class="text-[var(--muted-foreground)] text-sm">填寫完整資料後可以列印或下載你的專屬防災卡！</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-8">
+    <!-- 表單 -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm space-y-5">
+      <div>
+        <label class="block text-sm font-bold mb-2 text-[var(--foreground)]">👤 姓名</label>
+        <input type="text" id="cardName" placeholder="你的名字" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all" oninput="updateCard()">
+      </div>
+      <div>
+        <label class="block text-sm font-bold mb-2">🏫 學校 / 班級</label>
+        <input type="text" id="cardSchool" placeholder="學校名稱 六年○班" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all" oninput="updateCard()">
+      </div>
+
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-bold mb-2">👨 緊急聯絡人1</label>
+          <input type="text" id="contact1name" placeholder="父親/母親" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all mb-2" oninput="updateCard()">
+          <input type="text" id="contact1phone" placeholder="手機號碼" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all" oninput="updateCard()">
+        </div>
+        <div>
+          <label class="block text-sm font-bold mb-2">👩 緊急聯絡人2</label>
+          <input type="text" id="contact2name" placeholder="祖父母/親戚" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all mb-2" oninput="updateCard()">
+          <input type="text" id="contact2phone" placeholder="手機號碼" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all" oninput="updateCard()">
+        </div>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-bold mb-2">📍 家庭集合地點（至少2個）</label>
+        <input type="text" id="meetingPlace1" placeholder="集合地點1（例：家門口公園）" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all mb-2" oninput="updateCard()">
+        <input type="text" id="meetingPlace2" placeholder="集合地點2（例：里民活動中心）" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all" oninput="updateCard()">
+      </div>
+      
+      <div>
+        <label class="block text-sm font-bold mb-2">🏥 附近醫院 / 診所</label>
+        <input type="text" id="hospital" placeholder="醫療院所名稱及地址" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all" oninput="updateCard()">
+      </div>
+      
+      <div>
+        <label class="block text-sm font-bold mb-2">⚠️ 家庭成員特殊需求</label>
+        <textarea id="specialNeeds" placeholder="例：爺爺需要輪椅、妹妹對花生過敏..." rows="3" class="w-full p-3 border-2 border-[var(--border)] rounded-xl bg-[var(--background)] text-[var(--foreground)] focus:border-blue-400 outline-none transition-all resize-none" oninput="updateCard()"></textarea>
+      </div>
+      
+      <div class="flex gap-3">
+        <button onclick="completeCard()" class="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-all shadow-md">✅ 完成填寫</button>
+        <button onclick="printCard()" class="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 rounded-xl font-bold hover:opacity-90 transition-all shadow-md">🖨️ 列印防災卡</button>
+      </div>
+    </div>
+    
+    <!-- 預覽 -->
+    <div>
+      <h3 class="font-bold text-lg mb-3 flex items-center gap-2">👁️ 防災卡預覽</h3>
+      <div id="cardPreview" class="border-4 border-orange-400 rounded-2xl overflow-hidden shadow-xl">
+        <div class="bg-gradient-to-r from-orange-500 to-red-600 text-white p-4 flex items-center gap-3">
+          <div class="text-3xl">🛡️</div>
+          <div>
+            <div class="font-bold text-lg">家庭防災卡</div>
+            <div class="text-orange-100 text-xs">緊急聯絡單</div>
+          </div>
+          <div class="ml-auto text-right">
+            <div class="text-xs text-orange-100">🆘 防災專線</div>
+            <div class="font-bold">1991</div>
+          </div>
+        </div>
+        <div class="bg-white p-5 space-y-3">
+          <div class="text-center">
+            <div class="text-sm text-gray-500">持卡人</div>
+            <div class="text-xl font-bold text-gray-800" id="preview-name">___________</div>
+            <div class="text-sm text-gray-500" id="preview-school">學校 / 班級</div>
+          </div>
+          <hr class="border-orange-200">
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-blue-50 rounded-lg p-3">
+              <div class="text-xs text-blue-500 font-bold mb-1">📞 緊急聯絡人1</div>
+              <div class="font-medium text-gray-700" id="preview-c1name">—</div>
+              <div class="text-blue-600 font-bold" id="preview-c1phone">—</div>
+            </div>
+            <div class="bg-green-50 rounded-lg p-3">
+              <div class="text-xs text-green-500 font-bold mb-1">📞 緊急聯絡人2</div>
+              <div class="font-medium text-gray-700" id="preview-c2name">—</div>
+              <div class="text-green-600 font-bold" id="preview-c2phone">—</div>
+            </div>
+          </div>
+          <div class="bg-yellow-50 rounded-lg p-3 text-sm">
+            <div class="text-xs text-yellow-600 font-bold mb-1">📍 家庭集合地點</div>
+            <div class="text-gray-700">1. <span id="preview-place1">待填寫</span></div>
+            <div class="text-gray-700">2. <span id="preview-place2">待填寫</span></div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-red-50 rounded-lg p-3">
+              <div class="text-xs text-red-500 font-bold mb-1">🏥 醫療資訊</div>
+              <div class="text-gray-700" id="preview-hospital">待填寫</div>
+            </div>
+            <div class="bg-purple-50 rounded-lg p-3">
+              <div class="text-xs text-purple-500 font-bold mb-1">⚠️ 特殊需求</div>
+              <div class="text-gray-700 text-xs" id="preview-special">待填寫</div>
+            </div>
+          </div>
+          <div class="text-center text-xs text-gray-400 pt-2 border-t border-gray-100">
+            資料來源：內政部消防署 ｜ 製作日期：<span id="preview-date"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 逃生演練 ===== -->
+<div id="tab-escape" class="tab-content">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">🏃 逃生演練模擬器</h2>
+    <p class="text-[var(--muted-foreground)] text-sm">在各種情境中做出正確的防災決策！</p>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <div id="scenarioArea" class="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden shadow-sm">
+      <div id="scenarioHeader" class="p-5 text-white text-center">
+        <div class="text-5xl mb-3" id="scenarioIcon">🌍</div>
+        <h3 class="text-xl font-bold" id="scenarioTitle"></h3>
+        <p class="text-sm mt-2 opacity-90" id="scenarioDesc"></p>
+      </div>
+      <div class="p-5">
+        <h4 class="font-bold mb-3">❓ 你會怎麼做？</h4>
+        <div id="scenarioOptions" class="space-y-3"></div>
+        <div id="scenarioFeedback" class="hidden mt-4 p-4 rounded-xl text-sm"></div>
+        <button id="nextScenarioBtn" onclick="nextScenario()" class="hidden mt-4 w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all">下一個情境 →</button>
+      </div>
+    </div>
+    
+    <div class="space-y-5">
+      <!-- 分數板 -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold text-lg mb-4">🏆 演練成績</h3>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div class="bg-green-50 rounded-xl p-3">
+            <div class="text-2xl font-bold text-green-600" id="correctCount">0</div>
+            <div class="text-xs text-green-600">答對</div>
+          </div>
+          <div class="bg-red-50 rounded-xl p-3">
+            <div class="text-2xl font-bold text-red-500" id="wrongCount">0</div>
+            <div class="text-xs text-red-500">答錯</div>
+          </div>
+          <div class="bg-blue-50 rounded-xl p-3">
+            <div class="text-2xl font-bold text-blue-600" id="scenarioNum">1/5</div>
+            <div class="text-xs text-blue-600">情境進度</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 防災小叮嚀 -->
+      <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-200 rounded-2xl p-5">
+        <h3 class="font-bold text-orange-800 mb-3 flex items-center gap-2">📌 防災小叮嚀</h3>
+        <ul class="space-y-2 text-sm text-orange-700">
+          <li class="flex items-start gap-2"><span>🔸</span><span>平時多演練，緊急時才不會慌亂</span></li>
+          <li class="flex items-start gap-2"><span>🔸</span><span>熟記家庭成員集合地點</span></li>
+          <li class="flex items-start gap-2"><span>🔸</span><span>定期更新家庭防災卡資訊</span></li>
+          <li class="flex items-start gap-2"><span>🔸</span><span>帶著防災包，每3個月檢查一次</span></li>
+          <li class="flex items-start gap-2"><span>🔸</span><span>學習簡單急救技能（CPR）</span></li>
+        </ul>
+      </div>
+      
+      <!-- 逃生包檢核表 -->
+      <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-sm">
+        <h3 class="font-bold mb-3">🎒 逃生包檢核表</h3>
+        <div id="packChecklist" class="space-y-2 text-sm"></div>
+        <div class="mt-3 text-xs text-[var(--muted-foreground)]">完成率：<strong id="checklistProgress">0%</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 我的作品集 ===== -->
+<div id="tab-output" class="tab-content">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold flex items-center gap-2 mb-2">📤 我的作品集</h2>
+    <p class="text-[var(--muted-foreground)] text-sm">在這裡查看你的學習成果，可以列印或分享！</p>
+  </div>
+  
+  <div class="grid md:grid-cols-2 gap-6 mb-8">
+    <!-- 學習成績單 -->
+    <div class="bg-[var(--card)] border-2 border-blue-300 rounded-2xl overflow-hidden shadow-sm">
+      <div class="bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-4">
+        <h3 class="font-bold text-lg flex items-center gap-2">📊 防災學習成績單</h3>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
+          <span class="text-sm font-medium">📚 知識學習</span>
+          <div class="flex items-center gap-2">
+            <div class="w-24 bg-gray-200 rounded-full h-2">
+              <div id="report-k" class="progress-bar bg-blue-500 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <span class="text-sm font-bold" id="report-k-text">0%</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-purple-50 rounded-xl">
+          <span class="text-sm font-medium">🧠 知識測驗</span>
+          <div class="flex items-center gap-2">
+            <div class="w-24 bg-gray-200 rounded-full h-2">
+              <div id="report-q" class="progress-bar bg-purple-500 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <span class="text-sm font-bold" id="report-q-text">0%</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-green-50 rounded-xl">
+          <span class="text-sm font-medium">🗺️ 地圖挑戰</span>
+          <div class="flex items-center gap-2">
+            <div class="w-24 bg-gray-200 rounded-full h-2">
+              <div id="report-m" class="progress-bar bg-green-500 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <span class="text-sm font-bold" id="report-m-text">0%</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-orange-50 rounded-xl">
+          <span class="text-sm font-medium">📋 防災卡製作</span>
+          <div class="flex items-center gap-2">
+            <div class="w-24 bg-gray-200 rounded-full h-2">
+              <div id="report-c" class="progress-bar bg-orange-500 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <span class="text-sm font-bold" id="report-c-text">0%</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between p-3 bg-red-50 rounded-xl">
+          <span class="text-sm font-medium">🏃 逃生演練</span>
+          <div class="flex items-center gap-2">
+            <div class="w-24 bg-gray-200 rounded-full h-2">
+              <div id="report-e" class="progress-bar bg-red-500 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <span class="text-sm font-bold" id="report-e-text">0%</span>
+          </div>
+        </div>
+        <div class="mt-2 p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
+          <div class="flex items-center justify-between">
+            <span class="font-bold">🌟 總評分</span>
+            <span class="text-2xl font-bold text-orange-600" id="overallScore">0 分</span>
+          </div>
+          <div class="text-sm text-gray-500 mt-1" id="overallGrade">繼續加油！完成更多單元提升評分</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 徽章牆詳細版 -->
+    <div class="bg-[var(--card)] border-2 border-yellow-300 rounded-2xl overflow-hidden shadow-sm">
+      <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4">
+        <h3 class="font-bold text-lg flex items-center gap-2">🏅 我的防災英雄徽章</h3>
+      </div>
+      <div class="p-5">
+        <div id="fullBadgeWall" class="grid grid-cols-2 gap-3"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 輸出選項 -->
+  <div class="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm">
+    <h3 class="font-bold text-xl mb-5">📤 作品輸出選項</h3>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="border-2 border-blue-200 rounded-xl p-5 text-center hover:border-blue-400 hover:shadow-md transition-all cursor-pointer" onclick="printCard()">
+        <div class="text-4xl mb-3">🖨️</div>
+        <h4 class="font-bold text-blue-700 mb-2">列印家庭防災卡</h4>
+        <p class="text-xs text-gray-500 mb-3">將填寫完成的防災卡列印出來，放在書包或家中明顯位置</p>
+        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-all">立即列印</button>
+      </div>
+      <div class="border-2 border-green-200 rounded-xl p-5 text-center hover:border-green-400 hover:shadow-md transition-all cursor-pointer" onclick="printReport()">
+        <div class="text-4xl mb-3">📊</div>
+        <h4 class="font-bold text-green-700 mb-2">列印學習成績單</h4>
+        <p class="text-xs text-gray-500 mb-3">將學習歷程和成績單列印，分享給老師或家長</p>
+        <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-all">列印成績單</button>
+      </div>
+      <div class="border-2 border-purple-200 rounded-xl p-5 text-center hover:border-purple-400 hover:shadow-md transition-all cursor-pointer" onclick="shareToClassroom()">
+        <div class="text-4xl mb-3">🎓</div>
+        <h4 class="font-bold text-purple-700 mb-2">分享到 Google Classroom</h4>
+        <p class="text-xs text-gray-500 mb-3">複製學習成果連結，提交至 Google Classroom 作業</p>
+        <button class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-700 transition-all">複製分享碼</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- 通知 Toast -->
+<div id="toast" class="fixed bottom-6 right-6 z-50 hidden">
+  <div class="bg-gray-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 bounce-in text-sm max-w-xs">
+    <span id="toastIcon" class="text-xl"></span>
+    <span id="toastMessage"></span>
+  </div>
+</div>
+
+<!-- 列印樣式的隱藏防災卡 -->
+<div class="print-area" id="printCard">
+  <div style="max-width:400px;margin:0 auto;border:4px solid #f97316;border-radius:16px;overflow:hidden;font-family:sans-serif;">
+    <div style="background:linear-gradient(to right,#f97316,#dc2626);color:white;padding:16px;display:flex;align-items:center;gap:12px;">
+      <span style="font-size:28px;">🛡️</span>
+      <div><div style="font-weight:bold;font-size:18px;">家庭防災卡</div><div style="font-size:12px;opacity:0.8;">緊急聯絡單</div></div>
+      <div style="margin-left:auto;text-align:right;"><div style="font-size:11px;opacity:0.8;">🆘 防災專線</div><div style="font-weight:bold;font-size:16px;">1991</div></div>
+    </div>
+    <div style="background:white;padding:20px;" id="printContent"></div>
+  </div>
+</div>
+
+<script>
+// ========== 全局狀態 ==========
+let state = {
+  score: 0,
+  badges: [],
+  unitsCompleted: [],
+  knowledgeFlipped: new Set(),
+  quizScore: 0,
+  quizIndex: 0,
+  quizDone: false,
+  mapChallengeAnswered: false,
+  cardCompleted: false,
+  scenarioIndex: 0,
+  scenarioCorrect: 0,
+  scenarioWrong: 0,
+  packChecked: new Set()
+};
+
+// ========== 防災卡資料結構 ==========
+const allBadges = [
+  { id: 'reader', icon: '📖', name: '知識閱讀者', desc: '翻完所有知識卡', color: 'bg-blue-100 border-blue-400' },
+  { id: 'scholar', icon: '🎓', name: '防災學者', desc: '測驗得分60分以上', color: 'bg-purple-100 border-purple-400' },
+  { id: 'hero', icon: '🦸', name: '防災英雄', desc: '測驗滿分100分', color: 'bg-yellow-100 border-yellow-400' },
+  { id: 'mapper', icon: '🗺️', name: '地圖探索家', desc: '完成地圖挑戰', color: 'bg-green-100 border-green-400' },
+  { id: 'cardmaker', icon: '📋', name: '防災達人', desc: '完成防災卡填寫', color: 'bg-orange-100 border-orange-400' },
+  { id: 'runner', icon: '🏃', name: '逃生冠軍', desc: '演練全部答對', color: 'bg-red-100 border-red-400' },
+  { id: 'allstar', icon: '⭐', name: '防災全明星', desc: '完成所有單元', color: 'bg-gradient-to-br from-yellow-100 to-orange-100 border-yellow-500' },
+  { id: 'printer', icon: '🖨️', name: '行動派', desc: '列印防災卡', color: 'bg-cyan-100 border-cyan-400' },
+  { id: 'sharer', icon: '🤝', name: '知識傳播者', desc: '分享學習成果', color: 'bg-pink-100 border-pink-400' },
+  { id: 'emergency', icon: '🆘', name: '急救先鋒', desc: '記住1991防災專線', color: 'bg-red-100 border-red-500' },
+];
+
+// ========== 測驗題目 ==========
+const quizQuestions = [
+  { q: '地震發生時，在室內應該怎麼做？', options: ['趴下、掩護、穩住', '立刻跑出戶外', '躲到床底下', '打開門逃跑'], correct: 0, explain: '正確！「趴下、掩護、穩住」是地震時在室內最安全的基本動作，可以保護頭部和身體。' },
+  { q: '家庭防災卡應該放在哪裡最好？', options: ['隨身攜帶或放在書包', '鎖在保險箱', '放在書桌抽屜', '交給老師保管'], correct: 0, explain: '防災卡應隨身攜帶或放在書包，當災難發生時能立即取用聯絡資訊。' },
+  { q: '台灣的防災緊急專線是哪個號碼？', options: ['1991', '119', '110', '1234'], correct: 0, explain: '1991是台灣的防災緊急專線！遇到緊急情況也可以撥打119（消防）或110（警察）。' },
+  { q: '緊急避難包裡，最重要的物品是什麼？', options: ['飲用水和食物', '手機和平板', '零食和玩具', '書本和作業'], correct: 0, explain: '飲用水和食物是維持生命最基本的需求，避難包裡至少要準備3天份的飲水和乾糧。' },
+  { q: '火災逃生時，應該？', options: ['低姿勢移動，用濕布摀口鼻', '打開所有窗戶通風', '搭電梯快速逃離', '先收拾重要物品再逃'], correct: 0, explain: '火災時煙霧比火更危險！應低姿勢移動（煙霧在高處），並用濕布摀住口鼻防止吸入有毒氣體。' },
+  { q: '家庭逃生計畫應該設定幾個集合地點？', options: ['至少2個不同地點', '1個就夠了', '5個以上', '不需要設定'], correct: 0, explain: '至少設定2個集合地點！若第一個地點受災無法使用，還有第二個備用地點讓家人順利會合。' },
+  { q: '颱風來臨前，不正確的準備是？', options: ['打開窗戶讓風流通', '固定陽台花盆和物品', '儲備飲用水和食物', '手機電池充飽電'], correct: 0, explain: '颱風時應緊閉門窗，絕對不能打開窗戶！強風可能造成危險，也可能讓雨水湧入室內。' },
+  { q: '地震後，以下哪個行為是正確的？', options: ['先檢查瓦斯管線是否洩漏', '立刻打開所有電器', '回家拿重要物品', '在路邊等候救援'], correct: 0, explain: '地震後應先確認瓦斯管線是否有洩漏，若有瓦斯味應立刻關閉總開關並開窗通風。' },
+  { q: '學校地震演練，學生應該往哪裡集合？', options: ['操場等空曠處', '圖書室', '地下室', '廁所'], correct: 0, explain: '應往操場等空曠地方集合！遠離建築物、電線桿等可能倒塌的危險物品。' },
+  { q: '緊急避難包應該多久檢查更新一次？', options: ['每3個月一次', '每10年一次', '只需要準備一次', '每天檢查'], correct: 0, explain: '避難包應每3個月定期檢查，更換過期食物和藥品，確認電池電量，確保所有物品都能正常使用。' },
+];
+
+// ========== 情境演練 ==========
+const scenarios = [
+  {
+    title: '地震情境',
+    icon: '🌍',
+    color: 'from-orange-600 to-red-700',
+    desc: '上課中，突然感到強烈搖晃，老師大喊「地震！」',
+    options: [
+      { text: '立刻衝出教室跑到走廊', correct: false, explain: '❌ 逃跑途中可能因搖晃而跌倒，或被落下的物品砸傷。' },
+      { text: '趴在桌子下，抓緊桌腳掩護', correct: true, explain: '✅ 完全正確！趴下、掩護、穩住是地震時最安全的動作！' },
+      { text: '躲到教室角落縮成一團', correct: false, explain: '❌ 角落雖有牆壁，但沒有遮蔽物保護，不如躲在堅固桌子下。' },
+      { text: '打開窗戶大聲呼救', correct: false, explain: '❌ 地震中靠近窗戶非常危險，玻璃可能破碎造成傷害。' }
+    ]
+  },
+  {
+    title: '火災情境',
+    icon: '🔥',
+    color: 'from-red-600 to-rose-800',
+    desc: '聞到焦味，走廊已有濃煙，你在三樓教室',
+    options: [
+      { text: '打開門，搭電梯逃到一樓', correct: false, explain: '❌ 火災時禁止搭電梯！斷電或煙霧進入都可能讓你困在裡面。' },
+      { text: '用衣服摀住口鼻，低姿勢沿走廊逃到安全梯', correct: true, explain: '✅ 正確！低姿勢可避開上方煙霧，走安全梯比電梯更安全。' },
+      { text: '躲在教室等待救援，用東西封住門縫', correct: false, explain: '⚠️ 若能安全逃生應優先逃離；若火勢封住逃生路線，才應在原地等待救援並封住門縫。' },
+      { text: '打開所有窗戶，讓煙散去再逃', correct: false, explain: '❌ 開窗會讓氧氣流入助長火勢，應判斷情況選擇最快逃生路線。' }
+    ]
+  },
+  {
+    title: '颱風情境',
+    icon: '🌀',
+    color: 'from-blue-600 to-indigo-800',
+    desc: '颱風警報發布，你一個人在家，窗戶邊有許多花盆',
+    options: [
+      { text: '打開窗戶欣賞颱風景象', correct: false, explain: '❌ 颱風時禁止靠近或打開窗戶！強風可能造成生命危險。' },
+      { text: '把陽台花盆搬入室內，關好門窗', correct: true, explain: '✅ 完全正確！花盆被強風吹走可能砸傷他人，關閉門窗是基本安全措施。' },
+      { text: '出門採購更多食物備用', correct: false, explain: '❌ 颱風警報發布後應留在室內，外出非常危險。' },
+      { text: '打電話告訴朋友，然後去朋友家', correct: false, explain: '❌ 颱風天不應外出！應在原地等候颱風過境。' }
+    ]
+  },
+  {
+    title: '走失情境',
+    icon: '🏙️',
+    color: 'from-purple-600 to-violet-800',
+    desc: '地震後和家人失散，你獨自在外，手機沒電',
+    options: [
+      { text: '自己到處亂跑找家人', correct: false, explain: '❌ 自行亂跑可能更難被找到，且在災後環境中獨自行動很危險。' },
+      { text: '前往預先約定的集合地點等待', correct: true, explain: '✅ 完全正確！這就是為什麼平時要設定集合地點，家人會去那裡找你！' },
+      { text: '留在原地哭泣等人來救', correct: false, explain: '⚠️ 若原地安全可以等待，但應主動尋求成人幫助，向警察或消防員求助。' },
+      { text: '躲在廢墟中等待救援', correct: false, explain: '❌ 躲在廢墟中非常危險，應前往安全的集合地點。' }
+    ]
+  },
+  {
+    title: '避難包情境',
+    icon: '🎒',
+    color: 'from-green-600 to-teal-700',
+    desc: '緊急避難通知發布，你有5分鐘可以準備',
+    options: [
+      { text: '先打電話，再收拾所有玩具和遊戲機', correct: false, explain: '❌ 緊急撤離時間有限，玩具不是必要物品，應優先攜帶防災包和重要文件。' },
+      { text: '拿起預先準備好的避難包，聽從家長指示離開', correct: true, explain: '✅ 完全正確！這就是為什麼要事先準備好避難包，緊急時才能快速行動！' },
+      { text: '花時間整理所有衣物', correct: false, explain: '❌ 只需帶避難包中準備好的換洗衣物，不需額外整理所有衣服。' },
+      { text: '等確認颱風等級再決定要不要帶包', correct: false, explain: '❌ 收到避難通知就應立刻行動，不應拖延觀望。' }
+    ]
+  }
+];
+
+// ========== 逃生包清單 ==========
+const packItems = [
+  '💧 飲用水（至少3公升）', '🍱 食物（乾糧3天份）', '💊 急救藥品與個人藥物',
+  '🔦 手電筒和備用電池', '📻 收音機', '📄 重要文件（身分證影本）',
+  '💰 現金（小鈔）', '🧥 備用衣物和雨衣', '📋 家庭防災卡'
+];
+
+// ========== 防災小提示 ==========
+const tips = [
+  '地震時，「趴下、掩護、穩住」是最重要的三個動作！',
+  '家庭防災卡記得要填寫完整，並放在書包隨身攜帶！',
+  '緊急避難包要每3個月檢查一次，確認食物和電池有效期！',
+  '1991是台灣的防災緊急專線，請記在腦海中！',
+  '平時要和家人討論並演練逃生路線！',
+  '颱風來臨前，要固定陽台上的花盆和物品，避免砸傷他人！',
+  '火災逃生時，絕對不能搭乘電梯！',
+  '和家人設定2個以上的集合地點，以備不時之需！',
+];
+
+// ========== 初始化 ==========
+function init() {
+  document.getElementById('preview-date').textContent = new Date().toLocaleDateString('zh-TW');
+  renderBadgeWalls();
+  renderPackChecklist();
+  initScenario();
+  initQuiz();
+  document.getElementById('dailyTip').textContent = tips[Math.floor(Math.random() * tips.length)];
+}
+
+// ========== 標籤切換 ==========
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.className = btn.className.replace('bg-blue-600 text-white', 'bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]');
+  });
+  const activeBtn = document.querySelector(`[data-tab="${tab}"]`);
+  if (activeBtn) {
+    activeBtn.className = activeBtn.className.replace('bg-[var(--background)] text-[var(--muted-foreground)] hover:bg-[var(--accent)]', 'bg-blue-600 text-white');
+  }
+  updateReportCard();
+}
+
+// ========== 知識卡翻轉 ==========
+function flipCard(el, id) {
+  if (!state.knowledgeFlipped.has(id)) {
+    state.knowledgeFlipped.add(id);
+    addScore(5);
+    if (state.knowledgeFlipped.size === 6) {
+      awardBadge('reader');
+      document.getElementById('knowledgeComplete').classList.remove('hidden');
+      markUnit(0);
+      showToast('📖', '太棒了！你翻完了所有知識卡！');
+    }
+  }
+}
+
+// ========== 測驗系統 ==========
+let currentQuiz = [];
+function initQuiz() {
+  currentQuiz = [...quizQuestions].sort(() => Math.random() - 0.5).slice(0, 10);
+  state.quizIndex = 0;
+  state.quizScore = 0;
+  renderQuestion();
+}
+
+function renderQuestion() {
+  if (state.quizIndex >= currentQuiz.length) {
+    showQuizResult(); return;
+  }
+  const q = currentQuiz[state.quizIndex];
+  document.getElementById('quizArea').classList.remove('hidden');
+  document.getElementById('quizResult').classList.add('hidden');
+  document.getElementById('qNum').textContent = state.quizIndex + 1;
+  document.getElementById('quizScore').textContent = state.quizScore;
+  document.getElementById('quizProgress').style.width = ((state.quizIndex + 1) / 10 * 100) + '%';
+  document.getElementById('questionText').textContent = `Q${state.quizIndex + 1}. ${q.q}`;
+  document.getElementById('quizFeedback').classList.add('hidden');
+  document.getElementById('nextQuizBtn').classList.add('hidden');
+  const opt = document.getElementById('optionsArea');
+  opt.innerHTML = '';
+  q.options.forEach((o, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-option w-full text-left p-4 border-2 border-[var(--border)] bg-[var(--background)] rounded-xl text-sm hover:border-blue-400 transition-all';
+    btn.innerHTML = `<span class="font-bold mr-2">${['A','B','C','D'][i]}.</span>${o}`;
+    btn.onclick = () => checkAnswer(i, q);
+    opt.appendChild(btn);
+  });
+}
+
+function checkAnswer(selected, q) {
+  document.querySelectorAll('.quiz-option').forEach((btn, i) => {
+    btn.onclick = null;
+    if (i === q.correct) btn.classList.add('correct');
+    else if (i === selected && i !== q.correct) btn.classList.add('wrong');
+  });
+  const fb = document.getElementById('quizFeedback');
+  fb.classList.remove('hidden');
+  if (selected === q.correct) {
+    state.quizScore += 10;
+    fb.className = 'mt-4 p-4 rounded-xl text-sm font-medium bg-green-50 text-green-800 border border-green-300';
+    fb.innerHTML = '🎉 正確！' + q.explain;
+    addScore(10);
+  } else {
+    fb.className = 'mt-4 p-4 rounded-xl text-sm font-medium bg-red-50 text-red-800 border border-red-300';
+    fb.innerHTML = '❌ 答錯了。' + q.explain;
+  }
+  document.getElementById('nextQuizBtn').classList.remove('hidden');
+}
+
+function nextQuestion() {
+  state.quizIndex++;
+  renderQuestion();
+}
+
+function showQuizResult() {
+  document.getElementById('quizArea').classList.add('hidden');
+  document.getElementById('quizResult').classList.remove('hidden');
+  const score = state.quizScore;
+  document.getElementById('finalScoreDisplay').textContent = score + ' / 100 分';
+  let emoji, title, desc;
+  if (score >= 90) { emoji = '🏆'; title = '防災滿分英雄！'; desc = '太厲害了！你對防災知識瞭若指掌！'; awardBadge('hero'); }
+  else if (score >= 60) { emoji = '🎓'; title = '防災知識達人！'; desc = `得分${score}分，非常優秀！繼續保持！`; awardBadge('scholar'); }
+  else { emoji = '📚'; title = '繼續加油！'; desc = `得分${score}分，建議回到知識庫複習後再挑戰！`; }
+  document.getElementById('resultEmoji').textContent = emoji;
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultDesc').textContent = desc;
+  markUnit(1);
+  document.getElementById('report-q').style.width = score + '%';
+  document.getElementById('report-q-text').textContent = score + '%';
+}
+
+function restartQuiz() {
+  initQuiz();
+  document.getElementById('quizArea').classList.remove('hidden');
+  document.getElementById('quizResult').classList.add('hidden');
+}
+
+// ========== 地圖功能 ==========
+const roomData = {
+  classroom1f: { name: '一樓教室', icon: '🏫', info: '上課時發生地震，應先躲到桌下掩護，搖晃停止後再有序撤離至操場。', route: '→ 走廊 → 一樓出口 → 操場' },
+  classroom2f: { name: '二樓教室', icon: '🏫', info: '二樓教室逃生時，不可跳窗！應走安全梯或一般樓梯有序撤離。', route: '→ 安全梯/樓梯 → 一樓出口 → 操場' },
+  special: { name: '專科教室', icon: '🔬', info: '專科教室可能有實驗器材，發生地震時要特別注意不要碰觸化學藥品。', route: '→ 走廊 → 最近出口 → 操場' },
+  library: { name: '圖書室', icon: '📚', info: '圖書室書架多，地震時書架可能傾倒，要特別注意遠離書架！', route: '→ 中央走道 → 出口 → 操場' },
+  aid: { name: '急救站', icon: '🏥', info: '學校急救站位置，發生意外時可前往取得急救用品或尋求協助。', route: '緊急時撥打119' },
+  fire: { name: '消防設備', icon: '🧯', info: '消防設備包含滅火器和消防栓，要認識位置。初期小火才可嘗試使用滅火器。', route: '緊急撤離時不要耽誤' },
+  gate: { name: '大門出口', icon: '🚪', info: '大門是主要出入口，逃生時要保持冷靜，不要推擠，有秩序地撤離。', route: '→ 校門外安全區域' },
+};
+
+function showRoomInfo(id, name) {
+  const data = roomData[id] || { name, icon: '📍', info: '點擊其他區域查看資訊', route: '' };
+  document.getElementById('roomInfo').innerHTML = `
+    <h3 class="font-bold text-lg mb-3">${data.icon} ${data.name}</h3>
+    <div class="text-sm text-[var(--muted-foreground)] mb-3">${data.info}</div>
+    ${data.route ? `<div class="bg-green-50 border border-green-300 rounded-lg p-3 text-sm"><strong class="text-green-700">逃生路線：</strong><span class="text-green-600">${data.route}</span></div>` : ''}
+  `;
+  if (!state.mapChallengeAnswered) addScore(2);
+}
+
+function checkEscapeStep(step) {
+  const result = document.getElementById('challengeResult');
+  result.classList.remove('hidden');
+  if (step === 1) {
+    result.className = 'mt-3 p-3 rounded-lg text-sm font-medium bg-green-100 text-green-800 border border-green-300';
+    result.innerHTML = '✅ 完全正確！地震時先「趴下、掩護、穩住」，等搖晃停止後再有序撤離至操場集合！';
+    addScore(20);
+    awardBadge('mapper');
+    markUnit(2);
+    if (!state.mapChallengeAnswered) {
+      state.mapChallengeAnswered = true;
+      document.getElementById('report-m').style.width = '100%';
+      document.getElementById('report-m-text').textContent = '100%';
+    }
+  } else {
+    result.className = 'mt-3 p-3 rounded-lg text-sm font-medium bg-red-100 text-red-800 border border-red-300';
+    result.innerHTML = '❌ 答錯了！地震時不能立刻衝出去或搭電梯，應先「趴下、掩護、穩住」！再試試看！';
+  }
+}
+
+// ========== 防災卡功能 ==========
+function updateCard() {
+  document.getElementById('preview-name').textContent = document.getElementById('cardName').value || '___________';
+  document.getElementById('preview-school').textContent = document.getElementById('cardSchool').value || '學校 / 班級';
+  document.getElementById('preview-c1name').textContent = document.getElementById('contact1name').value || '—';
+  document.getElementById('preview-c1phone').textContent = document.getElementById('contact1phone').value || '—';
+  document.getElementById('preview-c2name').textContent = document.getElementById('contact2name').value || '—';
+  document.getElementById('preview-c2phone').textContent = document.getElementById('contact2phone').value || '—';
+  document.getElementById('preview-place1').textContent = document.getElementById('meetingPlace1').value || '待填寫';
+  document.getElementById('preview-place2').textContent = document.getElementById('meetingPlace2').value || '待填寫';
+  document.getElementById('preview-hospital').textContent = document.getElementById('hospital').value || '待填寫';
+  document.getElementById('preview-special').textContent = document.getElementById('specialNeeds').value || '無特殊需求';
+}
+
+function completeCard() {
+  const name = document.getElementById('cardName').value;
+  if (!name) { showToast('⚠️', '請先填寫你的姓名！'); return; }
+  if (!state.cardCompleted) {
+    state.cardCompleted = true;
+    awardBadge('cardmaker');
+    addScore(30);
+    markUnit(3);
+    document.getElementById('report-c').style.width = '100%';
+    document.getElementById('report-c-text').textContent = '100%';
+    showToast('📋', '防災卡填寫完成！獲得「防災達人」徽章！');
+  } else {
+    showToast('✅', '防災卡已更新！');
+  }
+}
+
+function printCard() {
+  const name = document.getElementById('cardName').value || '（未填寫）';
+  const school = document.getElementById('cardSchool').value || '—';
+  const c1n = document.getElementById('contact1name').value || '—';
+  const c1p = document.getElementById('contact1phone').value || '—';
+  const c2n = document.getElementById('contact2name').value || '—';
+  const c2p = document.getElementById('contact2phone').value || '—';
+  const p1 = document.getElementById('meetingPlace1').value || '待填寫';
+  const p2 = document.getElementById('meetingPlace2').value || '待填寫';
+  const hosp = document.getElementById('hospital').value || '—';
+  const special = document.getElementById('specialNeeds').value || '無';
+  document.getElementById('printContent').innerHTML = `
+    <div style="text-align:center;margin-bottom:12px;">
+      <div style="font-size:22px;font-weight:bold;">${name}</div>
+      <div style="color:#666;font-size:13px;">${school}</div>
+    </div>
+    <hr style="border-color:#fed7aa;margin:12px 0;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px;margin-bottom:10px;">
+      <div style="background:#eff6ff;border-radius:8px;padding:10px;">
+        <div style="color:#3b82f6;font-weight:bold;margin-bottom:4px;">📞 緊急聯絡人1</div>
+        <div style="font-weight:500;">${c1n}</div>
+        <div style="color:#2563eb;font-weight:bold;font-size:15px;">${c1p}</div>
+      </div>
+      <div style="background:#f0fdf4;border-radius:8px;padding:10px;">
+        <div style="color:#16a34a;font-weight:bold;margin-bottom:4px;">📞 緊急聯絡人2</div>
+        <div style="font-weight:500;">${c2n}</div>
+        <div style="color:#15803d;font-weight:bold;font-size:15px;">${c2p}</div>
+      </div>
+    </div>
+    <div style="background:#fefce8;border-radius:8px;padding:10px;font-size:13px;margin-bottom:10px;">
+      <div style="color:#ca8a04;font-weight:bold;margin-bottom:4px;">📍 家庭集合地點</div>
+      <div>1. ${p1}</div>
+      <div>2. ${p2}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">
+      <div style="background:#fef2f2;border-radius:8px;padding:10px;">
+        <div style="color:#dc2626;font-weight:bold;margin-bottom:4px;">🏥 醫療資訊</div>
+        <div>${hosp}</div>
+      </div>
+      <div style="background:#f5f3ff;border-radius:8px;padding:10px;">
+        <div style="color:#7c3aed;font-weight:bold;margin-bottom:4px;">⚠️ 特殊需求</div>
+        <div>${special}</div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:11px;color:#9ca3af;">🆘 防災專線：1991 ｜ 消防：119 ｜ 警察：110</div>
+    <div style="text-align:center;font-size:11px;color:#9ca3af;">製作日期：${new Date().toLocaleDateString('zh-TW')}</div>
+  `;
+  awardBadge('printer');
+  window.print();
+  showToast('🖨️', '正在列印防災卡...');
+}
+
+function printReport() {
+  showToast('📊', '列印功能：請使用瀏覽器的列印功能（Ctrl+P）');
+}
+
+function shareToClassroom() {
+  const summary = `我是防災小英雄！\n累積積分：${state.score}分\n獲得徽章：${state.badges.length}個\n完成單元：${state.unitsCompleted.length}/5個\n防災緊急專線：1991`;
+  navigator.clipboard.writeText(summary).then(() => {
+    showToast('🤝', '學習成果已複製到剪貼板！');
+    awardBadge('sharer');
+  }).catch(() => {
+    showToast('📋', '請手動複製學習成果分享給老師！');
+  });
+}
+
+// ========== 情境演練 ==========
+function initScenario() {
+  state.scenarioIndex = 0;
+  state.scenarioCorrect = 0;
+  state.scenarioWrong = 0;
+  renderScenario();
+}
+
+function renderScenario() {
+  if (state.scenarioIndex >= scenarios.length) {
+    showScenarioComplete(); return;
+  }
+  const sc = scenarios[state.scenarioIndex];
+  document.getElementById('scenarioNum').textContent = `${state.scenarioIndex + 1}/5`;
+  document.getElementById('correctCount').textContent = state.scenarioCorrect;
+  document.getElementById('wrongCount').textContent = state.scenarioWrong;
+  const header = document.getElementById('scenarioHeader');
+  header.className = `p-5 text-white text-center bg-gradient-to-br ${sc.color}`;
+  document.getElementById('scenarioIcon').textContent = sc.icon;
+  document.getElementById('scenarioTitle').textContent = sc.title;
+  document.getElementById('scenarioDesc').textContent = sc.desc;
+  document.getElementById('scenarioFeedback').classList.add('hidden');
+  document.getElementById('nextScenarioBtn').classList.add('hidden');
+  const opt = document.getElementById('scenarioOptions');
+  opt.innerHTML = '';
+  sc.options.forEach((o, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'w-full text-left p-3 border-2 border-[var(--border)] bg-[var(--background)] rounded-xl text-sm hover:border-blue-400 transition-all';
+    btn.innerHTML = `<span class="font-bold mr-2">${['A','B','C','D'][i]}.</span>${o.text}`;
+    btn.onclick = () => checkScenario(o, btn, opt);
+    opt.appendChild(btn);
+  });
+}
+
+function checkScenario(option, btn, opt) {
+  Array.from(opt.children).forEach(b => {
+    b.onclick = null;
+    b.className = b.className + ' opacity-50 cursor-not-allowed';
+  });
+  btn.className = btn.className.replace('opacity-50', '') + (option.correct ? ' border-green-500 bg-green-50' : ' border-red-400 bg-red-50');
+  const fb = document.getElementById('scenarioFeedback');
+  fb.classList.remove('hidden');
+  if (option.correct) {
+    state.scenarioCorrect++;
+    fb.className = 'mt-4 p-4 rounded-xl text-sm bg-green-50 text-green-800 border border-green-300';
+    addScore(15);
+  } else {
+    state.scenarioWrong++;
+    fb.className = 'mt-4 p-4 rounded-xl text-sm bg-red-50 text-red-800 border border-red-300';
+  }
+  fb.textContent = option.explain;
+  document.getElementById('correctCount').textContent = state.scenarioCorrect;
+  document.getElementById('wrongCount').textContent = state.scenarioWrong;
+  document.getElementById('nextScenarioBtn').classList.remove('hidden');
+}
+
+function nextScenario() {
+  state.scenarioIndex++;
+  renderScenario();
+}
+
+function showScenarioComplete() {
+  markUnit(4);
+  if (state.scenarioCorrect === 5) awardBadge('runner');
+  const escPct = Math.round((state.scenarioCorrect / 5) * 100);
+  document.getElementById('report-e').style.width = escPct + '%';
+  document.getElementById('report-e-text').textContent = escPct + '%';
+  document.getElementById('scenarioArea').innerHTML = `
+    <div class="p-10 text-center">
+      <div class="text-6xl mb-4">${state.scenarioCorrect >= 4 ? '🏆' : '📚'}</div>
+      <h3 class="text-2xl font-bold mb-2">演練完成！</h3>
+      <p class="text-[var(--muted-foreground)] mb-4">答對 ${state.scenarioCorrect}/5 情境</p>
+      <button onclick="initScenario();document.getElementById('scenarioArea').innerHTML=''" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all">再次演練</button>
+    </div>
+  `;
+  showToast('🏃', `逃生演練完成！答對${state.scenarioCorrect}/5個情境！`);
+}
+
+// ========== 逃生包清單 ==========
+function renderPackChecklist() {
+  const list = document.getElementById('packChecklist');
+  list.innerHTML = '';
+  packItems.forEach((item, i) => {
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-3 p-2 rounded-lg hover:bg-[var(--accent)] transition-all cursor-pointer';
+    div.innerHTML = `
+      <input type="checkbox" id="pack${i}" class="w-4 h-4 cursor-pointer accent-green-500" onchange="updateChecklist()">
+      <label for="pack${i}" class="cursor-pointer text-sm">${item}</label>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function updateChecklist() {
+  const checkboxes = document.querySelectorAll('[id^="pack"]');
+  let checked = 0;
+  checkboxes.forEach(cb => { if (cb.checked) checked++; });
+  const pct = Math.round((checked / packItems.length) * 100);
+  document.getElementById('checklistProgress').textContent = pct + '%';
+  if (pct === 100) {
+    showToast('🎒', '太棒了！你的逃生包準備齊全了！');
+    addScore(10);
+  }
+}
+
+// ========== 徽章系統 ==========
+function renderBadgeWalls() {
+  ['badgeWall', 'fullBadgeWall'].forEach(id => {
+    const wall = document.getElementById(id);
+    wall.innerHTML = '';
+    allBadges.forEach(badge => {
+      const earned = state.badges.includes(badge.id);
+      const div = document.createElement('div');
+      div.className = `border-2 rounded-xl p-3 text-center transition-all ${earned ? badge.color + ' shadow-md' : 'border-gray-200 bg-gray-50 opacity-40'}`;
+      div.innerHTML = `<div class="text-2xl">${earned ? badge.icon : '🔒'}</div><div class="text-xs font-bold mt-1 ${earned ? '' : 'text-gray-400'}">${badge.name}</div>${id === 'fullBadgeWall' ? `<div class="text-xs text-gray-400 mt-1">${badge.desc}</div>` : ''}`;
+      wall.appendChild(div);
+    });
+  });
+}
+
+function awardBadge(id) {
+  if (state.badges.includes(id)) return;
+  state.badges.push(id);
+  document.getElementById('badgeCount').textContent = state.badges.length;
+  const badge = allBadges.find(b => b.id === id);
+  if (badge) showToast(badge.icon, `獲得「${badge.name}」徽章！`);
+  renderBadgeWalls();
+  if (state.badges.length >= 7) { awardBadge('allstar'); }
+  awardBadge('emergency'); // 預設給緊急專線徽章
+}
+
+// ========== 分數 & 進度 ==========
+function addScore(pts) {
+  state.score += pts;
+  document.getElementById('totalScore').textContent = state.score;
+  updateReportCard();
+}
+
+function markUnit(idx) {
+  if (!state.unitsCompleted.includes(idx)) {
+    state.unitsCompleted.push(idx);
+    const pct = (state.unitsCompleted.length / 5) * 100;
+    document.getElementById('mainProgress').style.width = pct + '%';
+    document.getElementById('progressText').textContent = `${state.unitsCompleted.length} / 5 單元完成`;
+    const statuses = ['unit1-status', 'unit2-status', 'unit3-status', 'unit4-status', 'unit5-status'];
+    document.getElementById(statuses[idx]).textContent = '✅ 已完成';
+    document.getElementById(statuses[idx]).className = 'text-xs text-green-600 mt-1 font-medium';
+    if (state.unitsCompleted.length === 5) awardBadge('allstar');
+  }
+  updateReportCard();
+}
+
+function updateReportCard() {
+  const kPct = Math.round((state.knowledgeFlipped.size / 6) * 100);
+  document.getElementById('report-k').style.width = kPct + '%';
+  document.getElementById('report-k-text').textContent = kPct + '%';
+  const overall = Math.round(state.score / 2);
+  document.getElementById('overallScore').textContent = Math.min(overall, 100) + ' 分';
+  if (state.unitsCompleted.length >= 5) {
+    document.getElementById('overallGrade').textContent = '🌟 防災全明星！所有單元完成！';
+  } else if (state.unitsCompleted.length >= 3) {
+    document.getElementById('overallGrade').textContent = '👍 表現很好！繼續完成更多單元！';
+  }
+}
+
+// ========== Toast通知 ==========
+let toastTimeout;
+function showToast(icon, message) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastIcon').textContent = icon;
+  document.getElementById('toastMessage').textContent = message;
+  toast.classList.remove('hidden');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.add('hidden'), 3500);
+}
+
+// ========== 啟動 ==========
+init();
+</script>
+</body>
+</html>
